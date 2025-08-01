@@ -28,10 +28,12 @@ class MedicalRecommendationSystem:
         try:
             # Use torch.float16 for GPU to save VRAM. Use float32 for CPU.
             # device_map="auto" attempts to load model parts across available GPUs or CPU.
+            # ADDED load_in_8bit=True HERE for memory efficiency on Hugging Face Spaces
             self.model = AutoModelForCausalLM.from_pretrained(
                 llm_model_name,
                 torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                device_map="auto" # This helps with memory management on GPUs
+                device_map="auto",
+                load_in_8bit=True # Crucial for memory efficiency on CPU/limited VRAM
             )
             # If device_map="auto" fails or if on CPU, ensure model is on the correct device
             if self.device == "cpu" and self.model.device.type != "cpu":
@@ -41,10 +43,12 @@ class MedicalRecommendationSystem:
             print(f"Error loading LLM '{llm_model_name}' on {self.device}: {e}")
             print("Falling back to CPU only loading without auto-mapping...")
             try:
+                # ADDED load_in_8bit=True HERE for memory efficiency on Hugging Face Spaces (fallback)
                 self.model = AutoModelForCausalLM.from_pretrained(
                     llm_model_name,
                     torch_dtype=torch.float32, # Always use float32 for CPU
-                    device_map="cpu" # Force CPU
+                    device_map="cpu", # Force CPU
+                    load_in_8bit=True # Crucial for memory efficiency on CPU/limited VRAM
                 )
                 self.device = "cpu" # Confirm device is CPU
                 print(f"LLM '{llm_model_name}' loaded successfully on CPU as fallback.")
