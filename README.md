@@ -1,3 +1,13 @@
+---
+title: Medical Product Recommender AI
+emoji: 💊
+colorFrom: green
+colorTo: blue
+sdk: docker
+app_file: app.py
+port: 8000
+---
+
 # Symptom-Based Over-The-Counter Medical Product Recommendation System
 
 ## Project Overview
