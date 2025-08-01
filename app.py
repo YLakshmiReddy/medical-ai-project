@@ -127,4 +127,4 @@ if __name__ == "__main__":
     # To run the FastAPI app:
     #   Open your terminal, navigate to the project directory, and run:
     #   uvicorn app:app --reload --host 0.0.0.0 --port 8000
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=10000)
