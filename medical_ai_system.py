@@ -5,7 +5,7 @@ from rag_system import MedicalProductRAG # Import your RAG system
 import torch
 
 class MedicalRecommendationSystem:
-    def __init__(self, llm_model_name="microsoft/phi-2", data_path="medical_products.json"):
+    def __init__(self, llm_model_name="google/gemma-2b", data_path="medical_products.json"): # CHANGED LLM MODEL NAME
         """
         Initializes the medical recommendation system with an LLM and RAG.
         Args:
@@ -28,12 +28,11 @@ class MedicalRecommendationSystem:
         try:
             # Use torch.float16 for GPU to save VRAM. Use float32 for CPU.
             # device_map="auto" attempts to load model parts across available GPUs or CPU.
-            # ADDED load_in_8bit=True HERE for memory efficiency on Hugging Face Spaces
+            # REMOVED load_in_8bit=True here as Gemma-2B is smaller
             self.model = AutoModelForCausalLM.from_pretrained(
                 llm_model_name,
                 torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                device_map="auto",
-                load_in_8bit=True # Crucial for memory efficiency on CPU/limited VRAM
+                device_map="auto" # This helps with memory management on GPUs
             )
             # If device_map="auto" fails or if on CPU, ensure model is on the correct device
             if self.device == "cpu" and self.model.device.type != "cpu":
@@ -43,12 +42,11 @@ class MedicalRecommendationSystem:
             print(f"Error loading LLM '{llm_model_name}' on {self.device}: {e}")
             print("Falling back to CPU only loading without auto-mapping...")
             try:
-                # ADDED load_in_8bit=True HERE for memory efficiency on Hugging Face Spaces (fallback)
+                # REMOVED load_in_8bit=True here (fallback)
                 self.model = AutoModelForCausalLM.from_pretrained(
                     llm_model_name,
                     torch_dtype=torch.float32, # Always use float32 for CPU
-                    device_map="cpu", # Force CPU
-                    load_in_8bit=True # Crucial for memory efficiency on CPU/limited VRAM
+                    device_map="cpu" # Force CPU
                 )
                 self.device = "cpu" # Confirm device is CPU
                 print(f"LLM '{llm_model_name}' loaded successfully on CPU as fallback.")
@@ -99,7 +97,7 @@ class MedicalRecommendationSystem:
             f"Your task is to provide a concise and direct recommendation. "
             f"You MUST only use information from the 'Available Products (Context)' section below. "
             f"Do NOT add any external knowledge, disclaimers, or conversational filler. "
-            f"Just the direct recommendation(s) in a numbered list.\n\n" # Removed "following the exact format" for simpler guidance
+            f"Just the direct recommendation(s) in a numbered list.\n\n"
             f"--- Available Products (Context) ---\n"
             f"{context}\n\n"
             f"--- User Symptoms ---\n"
@@ -107,7 +105,7 @@ class MedicalRecommendationSystem:
             f"--- Recommendation ---\n"
             f"Based on the user's symptoms and the provided product information, recommend the most appropriate "
             f"over-the-counter medical product(s). For each recommended product, clearly state its name, its primary use case, and its potential side effects."
-            f"Example: 1. Product Name: [Name], Use: [Use Case], Side Effects: [Side Effects]\n" # Simplified example here too
+            f"Example: 1. Product Name: [Name], Use: [Use Case], Side Effects: [Side Effects]\n"
             f"Recommendation:"
         )
 
@@ -145,9 +143,9 @@ class MedicalRecommendationSystem:
         if "--- Recommendation ---" in llm_recommendation: # Catch partial repetitions of this marker
             llm_recommendation = llm_recommendation.split("--- Recommendation ---")[0].strip()
         
-        # This part is removed for now to see raw model output (as discussed in previous step)
-        # if not llm_recommendation or len(llm_recommendation.split()) < 10: 
-        #     llm_recommendation = "I'm sorry, I couldn't generate a specific recommendation based on the provided information. Please consult a medical professional if your symptoms persist or worsen."
+        # Fallback message (if generation failed to produce meaningful output)
+        if not llm_recommendation or len(llm_recommendation.split()) < 5: 
+            llm_recommendation = "I'm sorry, I couldn't generate a specific recommendation based on the provided information. Please consult a medical professional if your symptoms persist or worsen."
 
 
         # Calculate a simple confidence score (still based on retrieved products)
