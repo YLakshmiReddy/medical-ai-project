@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Recommendation System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #e6f2ff; /* Light blue background */
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border: 1px solid #cce0ff;
+        }
+        h1 {
+            color: #004080; /* Darker blue */
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 2.2em;
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        textarea {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #a3c2e0;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1.1em;
+            resize: vertical; /* Allow vertical resizing */
+            min-height: 100px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 14px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.2em;
+            width: 100%;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #response {
+            margin-top: 30px;
+            padding: 25px;
+            border: 1px solid #d4edda; /* Light green border */
+            border-radius: 8px;
+            background-color: #f0fdf0; /* Very light green background */
+            min-height: 150px;
+            color: #155724; /* Dark green text */
+        }
+        #response p {
+            margin-bottom: 12px;
+            line-height: 1.7;
+        }
+        #response strong {
+            color: #004080;
+        }
+        #response ul {
+            list-style-type: disc;
+            padding-left: 20px;
+            margin-top: 15px;
+            border-top: 1px dashed #cce0ff;
+            padding-top: 15px;
+        }
+        #response li {
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+        .loading {
+            text-align: center;
+            font-style: italic;
+            color: #666;
+            margin-top: 15px;
+        }
+        .error-message {
+            color: #dc3545; /* Red for errors */
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💊 AI Medical Product Recommender 💊</h1>
+        <label for="symptomsInput">Enter your symptoms:</label>
+        <textarea id="symptomsInput" rows="5" placeholder="e.g., I have a bad headache and a high fever."></textarea>
+        <button onclick="getRecommendation()">Get Recommendation</button>
+        <div id="response">
+            <p>Your AI-powered medical product recommendation will appear here. Please provide symptoms clearly.</p>
+        </div>
+    </div>
+
+    <script>
+        async function getRecommendation() {
+            const symptoms = document.getElementById('symptomsInput').value;
+            const responseDiv = document.getElementById('response');
+            
+            if (!symptoms.trim()) {
+                responseDiv.innerHTML = '<p class="error-message">Please enter your symptoms before requesting a recommendation.</p>';
+                return;
+            }
+
+            responseDiv.innerHTML = '<p class="loading">Searching and generating recommendation... This may take a moment, especially on the first query.</p>';
+
+            try {
+                // The API is running locally on port 8000
+                const apiEndpoint = 'http://127.0.0.1:8000/recommend'; 
+
+                const response = await fetch(apiEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ symptoms: symptoms })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`API error: ${response.status} - ${errorData.detail || 'Unknown error'}`);
+                }
+
+                const data = await response.json();
+                
+                let htmlOutput = `
+                    <p><strong>AI Recommendation:</strong></p>
+                    <p>${data.recommendation}</p>
+                    <p><strong>Confidence Score:</strong> ${data.confidence_score.toFixed(2)}</p>
+                `;
+
+                if (data.retrieved_products && data.retrieved_products.length > 0) {
+                    htmlOutput += '<p><strong>Relevant Products Found in Database (Context for AI):</strong></p><ul>';
+                    data.retrieved_products.forEach(p => {
+                        htmlOutput += `
+                            <li>
+                                <strong>${p.product_name}</strong> (Relevance: ${p.relevance_score.toFixed(2)})<br>
+                                <em>Use For:</em> ${p.use_for}<br>
+                                <em>Side Effects:</em> ${p.side_effects}
+                            </li>
+                        `;
+                    });
+                    htmlOutput += '</ul>';
+                } else {
+                    htmlOutput += '<p><em>No specific relevant products were found in the database for this query.</em></p>';
+                }
+
+                responseDiv.innerHTML = htmlOutput;
+
+            } catch (error) {
+                console.error("Error fetching recommendation:", error);
+                responseDiv.innerHTML = `<p class="error-message">Failed to get recommendation: ${error.message}. Please ensure the backend server is running correctly (check your terminal).</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
