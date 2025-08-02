@@ -85,7 +85,7 @@ class MedicalRecommendationSystem:
                 "retrieved_products": []
             }
 
-        # 2. Prepare context for the LLM -- NEW, SIMPLIFIED FORMAT FOR LLM
+        # 2. Prepare context for the LLM
         context_parts = []
         for i, product in enumerate(retrieved_products):
             context_parts.append(
@@ -93,10 +93,10 @@ class MedicalRecommendationSystem:
                 f"USE CASE: {product.get('use_for', 'N/A')}\n"
                 f"SIDE EFFECTS: {product.get('side_effects', 'No known side effects')}\n"
             )
-        context = "\n---\n".join(context_parts) # Separate products with --- for clarity
+        context = "\n---\n".join(context_parts)
 
 
-        # 3. Create the prompt for the LLM -- NEW, MORE DIRECTIVE PROMPT
+        # 3. Create the prompt for the LLM
         prompt = (
             f"You are a helpful AI assistant specialized in recommending over-the-counter medical products. "
             f"Your task is to provide a concise and direct recommendation. "
@@ -114,49 +114,45 @@ class MedicalRecommendationSystem:
             f"Recommendation:"
         )
 
-        # 4. Generate response using the LLM -- UPDATED GENERATION PARAMETERS
+        # 4. Generate response using the LLM
         inputs = self.tokenizer(prompt, return_tensors="pt", return_attention_mask=True).to(self.device)
 
         output_tokens = self.model.generate(
             **inputs,
-            max_new_tokens=150,     # Drastically reduced to prevent rambling
-            num_beams=1,            # Use greedy search (deterministic)
-            do_sample=False,        # Do not sample (deterministic)
-            temperature=0.7,        # Will be ignored, but good practice to keep
-            top_k=50,               # Will be ignored, but good practice to keep
-            no_repeat_ngram_size=2, # Helps avoid repetitive phrases
-            early_stopping=True,    # Will be ignored, but good practice to keep
+            max_new_tokens=150,
+            num_beams=1,
+            do_sample=False,
+            temperature=0.7,
+            top_k=50,
+            no_repeat_ngram_size=2,
+            early_stopping=True,
             pad_token_id=self.tokenizer.pad_token_id,
-            eos_token_id=self.tokenizer.eos_token_id, # Explicitly tell model what end-of-sentence token is
+            eos_token_id=self.tokenizer.eos_token_id,
         )
 
         generated_text = self.tokenizer.decode(output_tokens[0], skip_special_tokens=True)
 
-        # Post-process: Extract only the LLM's recommendation part -- REFINED CLEANUP
+        # Post-process: Extract only the LLM's recommendation part
         llm_recommendation = generated_text.strip()
         
-        # Look for the last occurrence of "Recommendation:" and extract everything after it.
         start_marker = "\nRecommendation:"
         if start_marker in llm_recommendation:
             llm_recommendation = llm_recommendation.rpartition(start_marker)[2].strip()
         
-        # Aggressive cleanup for common Phi-2/Gemma repetitions/runaways
         if "--- Available Products (Context) ---" in llm_recommendation:
             llm_recommendation = llm_recommendation.split("--- Available Products (Context) ---")[0].strip()
         if "--- User Symptoms ---" in llm_recommendation:
             llm_recommendation = llm_recommendation.split("--- User Symptoms ---")[0].strip()
-        if "--- Recommendation ---" in llm_recommendation: # Catch partial repetitions of this marker
+        if "--- Recommendation ---" in llm_recommendation:
             llm_recommendation = llm_recommendation.split("--- Recommendation ---")[0].strip()
         
-        # Fallback message (if generation failed to produce meaningful output)
         if not llm_recommendation or len(llm_recommendation.split()) < 5: 
             llm_recommendation = "I'm sorry, I couldn't generate a specific recommendation based on the provided information. Please consult a medical professional if your symptoms persist or worsen."
 
 
-        # Calculate a simple confidence score (still based on retrieved products)
+        # Calculate a simple confidence score
         confidence_score = 0.0
         if retrieved_products:
-            # Take the relevance score of the top retrieved product as a proxy for confidence
             confidence_score = retrieved_products[0].get('relevance_score', 0.0)
 
         print(f"LLM Recommendation Generated. Confidence: {confidence_score:.2f}")
@@ -164,15 +160,12 @@ class MedicalRecommendationSystem:
         return {
             "recommendation": llm_recommendation,
             "confidence_score": confidence_score,
-            "retrieved_products": retrieved_products # Include retrieved products for debugging/info
+            "retrieved_products": retrieved_products
         }
 
 if __name__ == "__main__":
-    # This block runs only when medical_ai_system.py is executed directly
     print("--- Testing MedicalRecommendationSystem ---")
     
-    # Initialize the full system. This will load the LLM and build the RAG index.
-    # This step can take a while on the first run as the LLM is downloaded.
     system = MedicalRecommendationSystem()
 
     test_cases = [
@@ -200,4 +193,4 @@ if __name__ == "__main__":
                 print(f"    Side Effects: {p.get('side_effects', 'N/A')}")
         else:
             print("  No products were retrieved for this query.")
-        print("-" * 80) # Separator for readability
+        print("-" * 80)

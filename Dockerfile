@@ -13,18 +13,18 @@ ENV HF_HOME /app/.cache/huggingface
 # ADD THIS LINE: Crucial for BitsAndBytes 4-bit quantization on CPU (experimental)
 ENV TRANSFORMERS_BITSANDBYTES_CPU_COMPATIBILITY=1
 
-# COPY requirements.txt before installing anything.
+# Copy the requirements file into the container
 COPY requirements.txt .
 
-# Install packages from requirements.txt
-# This will install bitsandbytes, and torch (should be CPU-only from PyPI now)
+# Install any needed packages specified in requirements.txt
+# This will install bitsandbytes, and torch will be installed generically (CPU-only as a result)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code into the container
 COPY . .
 
 # Expose the port that FastAPI will run on
-EXPOSE 10000 # Render default port
+EXPOSE 10000 # Render default port (COMMENT IS FIXED HERE)
 
 # Command to run the application
 CMD ["bash", "entrypoint.sh"] # Use bash to run the shell script
