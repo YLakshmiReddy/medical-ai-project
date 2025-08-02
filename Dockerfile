@@ -10,14 +10,14 @@ WORKDIR /app
 ENV HF_HUB_DISABLE_SYMLINKS_WARNING=1
 ENV HF_HOME /app/.cache/huggingface
 
-# ADD THIS LINE: Crucial for BitsAndBytes 4-bit quantization on CPU (experimental)
-ENV TRANSFORMERS_BITSANDBYTES_CPU_COMPATIBILITY=1
+# Removed TRANSFORMERS_BITSANDBYTES_CPU_COMPATIBILITY for Colab path.
+# This Dockerfile is for Render/HuggingFace if you try Docker again.
+# For Colab, Dockerfile is not used directly.
 
 # Copy the requirements file into the container
 COPY requirements.txt .
 
 # Install any needed packages specified in requirements.txt
-# This will install bitsandbytes, and torch will be installed generically (CPU-only as a result)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code into the container

@@ -1,11 +1,11 @@
 # D:\medical_ai_project\medical_ai_system.py
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig # ADD BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer # REMOVED BitsAndBytesConfig import
 from rag_system import MedicalProductRAG # Import your RAG system
 import torch
 
 class MedicalRecommendationSystem:
-    def __init__(self, llm_model_name="google/gemma-2b", data_path="medical_products.json"): # CHANGED LLM MODEL NAME to Gemma-2B
+    def __init__(self, llm_model_name="google/gemma-2b", data_path="medical_products.json"): # Gemma-2B LLM
         """
         Initializes the medical recommendation system with an LLM and RAG.
         Args:
@@ -14,18 +14,11 @@ class MedicalRecommendationSystem:
         """
         print(f"Initializing LLM: {llm_model_name}...")
         
-        # Determine device (GPU if available, else CPU)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"Using device: {self.device}")
 
-        # Define 4-bit quantization config for memory efficiency
-        # This is for the `load_in_4bit` argument
-        bnb_config = BitsAndBytesConfig(
-            load_in_4bit=True,                 # Enable 4-bit loading
-            bnb_4bit_quant_type="nf4",         # Use NormalFloat4 quantization
-            bnb_4bit_use_double_quant=True,    # Use double quantization
-            bnb_4bit_compute_dtype=torch.float16, # Compute dtype. Even on CPU, this is for bnb internals.
-        )
+        # REMOVED BitsAndBytesConfig DEFINITION BLOCK HERE
+        # (e.g., no bnb_config = BitsAndBytesConfig(...) )
 
         # Load Tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(llm_model_name)
@@ -36,20 +29,22 @@ class MedicalRecommendationSystem:
         try:
             self.model = AutoModelForCausalLM.from_pretrained(
                 llm_model_name,
-                quantization_config=bnb_config, # Apply 4-bit quantization config
+                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32, # Use float16 for CUDA, float32 for CPU
+                # REMOVED quantization_config=bnb_config (no 4-bit loading for Colab GPU)
                 device_map="auto" # Let accelerate manage device mapping
             )
-            # If device_map="auto" puts it on meta/cpu and device is CPU, ensure it's on right device.
+            # Ensure model is on the correct device if device_map="auto" puts it on meta/cpu and device is CPU
             if self.device == "cpu" and self.model.device.type != "cpu":
                  self.model.to(self.device)
             print(f"LLM '{llm_model_name}' loaded successfully on {self.device}.")
         except Exception as e:
             print(f"Error loading LLM '{llm_model_name}' on {self.device}: {e}")
-            print("Falling back to CPU only loading with explicit 4-bit config...")
+            print("Falling back to CPU only loading without auto-mapping...")
             try:
                 self.model = AutoModelForCausalLM.from_pretrained(
                     llm_model_name,
-                    quantization_config=bnb_config, # Apply 4-bit config
+                    torch_dtype=torch.float32, # Always use float32 for CPU fallback
+                    # REMOVED quantization_config=bnb_config (no 4-bit loading for Colab GPU)
                     device_map="cpu" # Force CPU in fallback
                 )
                 self.device = "cpu"
@@ -119,15 +114,15 @@ class MedicalRecommendationSystem:
 
         output_tokens = self.model.generate(
             **inputs,
-            max_new_tokens=150,
-            num_beams=1,
-            do_sample=False,
-            temperature=0.7,
-            top_k=50,
-            no_repeat_ngram_size=2,
-            early_stopping=True,
+            max_new_tokens=150,     # Drastically reduced to prevent rambling
+            num_beams=1,            # Use greedy search (deterministic)
+            do_sample=False,        # Do not sample (deterministic)
+            temperature=0.7,        # Will be ignored, but good practice to keep
+            top_k=50,               # Will be ignored, but good practice to keep
+            no_repeat_ngram_size=2, # Helps avoid repetitive phrases
+            early_stopping=True,    # Will be ignored, but good practice to keep
             pad_token_id=self.tokenizer.pad_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
+            eos_token_id=self.tokenizer.eos_token_id, # Explicitly tell model what end-of-sentence token is
         )
 
         generated_text = self.tokenizer.decode(output_tokens[0], skip_special_tokens=True)

@@ -3,8 +3,8 @@ sentence-transformers
 faiss-cpu
 fastapi
 uvicorn[standard]
-torch
+torch # For Colab, this will correctly pull the GPU version with the right Colab runtime.
 accelerate
 pydantic
 numpy
-bitsandbytes==0.43.1 # ADD THIS LINE
+# REMOVED bitsandbytes as it's not needed for standard GPU usage in Colab
