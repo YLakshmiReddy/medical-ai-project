@@ -3,6 +3,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware # NEW: Import CORSMiddleware
 from pydantic import BaseModel
 from medical_ai_system import MedicalRecommendationSystem # Import your main system
 import uvicorn
@@ -14,6 +15,28 @@ app = FastAPI(
     description="API for recommending over-the-counter medical products based on symptoms using LLM and RAG.",
     version="1.0.0"
 )
+
+# NEW: Configure CORS middleware
+# This allows your frontend (even if run directly from file system or a different port)
+# to make requests to your FastAPI backend.
+origins = [
+    "http://localhost",
+    "http://localhost:8000",
+    "http://127.0.0.1",
+    "http://127.0.0.1:8000",
+    # If deploying, add your deployment URL here (e.g., "https://your-huggingface-space-url.hf.space")
+    "*" # For broad local testing and initial deployment, you can allow all origins,
+        # but for production, restrict this to your actual frontend domain.
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"], # Allows all methods (POST, GET, etc.)
+    allow_headers=["*"], # Allows all headers
+)
+
 
 # --- Pydantic Models for Request and Response ---
 # These define the expected data structures for your API.
@@ -51,9 +74,8 @@ async def startup_event():
         print("MedicalRecommendationSystem initialized successfully.")
     except Exception as e:
         print(f"CRITICAL ERROR: Failed to initialize MedicalRecommendationSystem: {e}")
-        # In a production environment, you might want to log this extensively
-        # and perhaps exit the application if it cannot function without the AI system.
-        # For this test, we'll raise an HTTPException which will prevent server from fully starting.
+        # Raising HTTPException will cause the FastAPI app to fail startup, which is
+        # appropriate for a critical dependency.
         raise HTTPException(status_code=500, detail=f"Failed to initialize AI system: {e}. Check server logs for details.")
 
 # --- API Endpoints ---
@@ -61,6 +83,8 @@ async def startup_event():
 # Mount a static files directory (for your HTML, CSS, JS)
 # This serves files from the current directory under the /static/ path.
 # We're making index.html available directly from the root though.
+# Note: For simple single-page apps like this, mounting the directory where index.html is
+# and then serving index.html from root is common.
 app.mount("/static", StaticFiles(directory="."), name="static")
 
 @app.get("/", response_class=HTMLResponse)
@@ -90,6 +114,8 @@ async def recommend_product(input: SymptomInput):
     - **retrieved_products**: A list of detailed information for products identified as relevant by the RAG system.
     """
     if medical_system is None:
+        # This state should ideally not be reached if startup_event raises HTTPException on failure,
+        # but good as a safety check if initialization takes too long or has a soft failure.
         raise HTTPException(status_code=503, detail="AI system not yet initialized. Please wait a moment or check server logs.")
 
     try:

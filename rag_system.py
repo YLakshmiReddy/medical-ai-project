@@ -87,13 +87,30 @@ class MedicalProductRAG:
         distances, indices = self.index.search(np.array([query_embedding]), k)
 
         retrieved_products = []
+        # Normalizing distances to a score between 0 and 1, where 1 is best match (0 distance)
+        # Using 1 / (1 + distance) is a simple way to achieve this.
+        # Max distance is theoretically unbounded, so finding a 'max_dist' might require iterating through all or estimating.
+        # For small k, relative scoring based on the retrieved distances is fine.
+        
+        # Determine a max_possible_distance for a rough normalization if needed, or just use inverse.
+        # For L2 distance, a smaller distance is better.
+        # We want higher scores for smaller distances.
+        
+        # Let's adjust the score calculation. A simple way for a relevance score based on distance:
+        # Score = exp(-distance / scale_factor). This is common for similarity where 0 distance is 1.0.
+        # For simplicity, we can also use 1.0 - (distance / max_observed_distance) for the retrieved set.
+        # Let's calculate the max distance among the retrieved to normalize.
+        max_retrieved_distance = max(distances[0]) if distances[0].size > 0 else 1.0 # Avoid div by zero
+
         for i, idx in enumerate(indices[0]):
-            if idx != -1: # Ensure a valid index was found (FAISS returns -1 for no match)
+            if idx != -1: # Ensure a valid index was found
                 product_info = self.products[idx].copy()
-                # Calculate relevance score: 1 - (normalized_distance). Lower distance = higher relevance.
-                # Assuming distances are positive and we want a score between 0 and 1.
-                # Max distance could vary, so 1 - dist is a simple proxy.
-                product_info['relevance_score'] = 1 - (distances[0][i] / (distances[0][0] + 1e-6)) # Normalize by closest dist
+                # A more robust relevance score: 1 - (distance / (max_possible_distance_in_embedding_space))
+                # Or relative to the max distance found in *this* retrieval
+                # The smaller the distance, the higher the score.
+                # Max distance could be large, so 1 / (1 + distance) is safer for a 0-1 range.
+                product_info['relevance_score'] = 1 / (1 + distances[0][i]) # Closer to 1 for perfect match
+
                 retrieved_products.append(product_info)
         
         # Sort by relevance score in descending order
@@ -132,4 +149,4 @@ if __name__ == "__main__":
                 print(f"      Relevance Score: {product.get('relevance_score', 0.0):.4f}") # Display more precision
         else:
             print("  No relevant products found.")
-    print("\n--- RAG System Test Complete ---")
+        print("-" * 80)

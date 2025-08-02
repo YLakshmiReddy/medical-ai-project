@@ -10,13 +10,8 @@ WORKDIR /app
 ENV HF_HUB_DISABLE_SYMLINKS_WARNING=1
 ENV HF_HOME /app/.cache/huggingface
 
-# Removed TRANSFORMERS_BITSANDBYTES_CPU_COMPATIBILITY for Colab path.
-# This Dockerfile is for Render/HuggingFace if you try Docker again.
-# For Colab, Dockerfile is not used directly.
-
 # Copy the requirements file into the container
 COPY requirements.txt .
-
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -24,7 +19,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Expose the port that FastAPI will run on
-EXPOSE 10000 
+EXPOSE 8000
 
 # Command to run the application
 CMD ["bash", "entrypoint.sh"] # Use bash to run the shell script

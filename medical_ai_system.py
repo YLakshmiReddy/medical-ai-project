@@ -1,11 +1,12 @@
 # D:\medical_ai_project\medical_ai_system.py
 
-from transformers import AutoModelForCausalLM, AutoTokenizer # REMOVED BitsAndBytesConfig import
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from rag_system import MedicalProductRAG # Import your RAG system
 import torch
 
 class MedicalRecommendationSystem:
-    def __init__(self, llm_model_name="google/gemma-2b", data_path="medical_products.json"): # Gemma-2B LLM
+    # Using TinyLlama as it's accessible without authentication
+    def __init__(self, llm_model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0", data_path="medical_products.json"):
         """
         Initializes the medical recommendation system with an LLM and RAG.
         Args:
@@ -14,11 +15,9 @@ class MedicalRecommendationSystem:
         """
         print(f"Initializing LLM: {llm_model_name}...")
         
+        # Check if CUDA (GPU) is available, otherwise use CPU
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"Using device: {self.device}")
-
-        # REMOVED BitsAndBytesConfig DEFINITION BLOCK HERE
-        # (e.g., no bnb_config = BitsAndBytesConfig(...) )
 
         # Load Tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(llm_model_name)
@@ -27,10 +26,10 @@ class MedicalRecommendationSystem:
         
         # Load the LLM model
         try:
+            # Use float16 for CUDA to save VRAM, float32 for CPU
             self.model = AutoModelForCausalLM.from_pretrained(
                 llm_model_name,
-                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32, # Use float16 for CUDA, float32 for CPU
-                # REMOVED quantization_config=bnb_config (no 4-bit loading for Colab GPU)
+                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
                 device_map="auto" # Let accelerate manage device mapping
             )
             # Ensure model is on the correct device if device_map="auto" puts it on meta/cpu and device is CPU
@@ -39,21 +38,21 @@ class MedicalRecommendationSystem:
             print(f"LLM '{llm_model_name}' loaded successfully on {self.device}.")
         except Exception as e:
             print(f"Error loading LLM '{llm_model_name}' on {self.device}: {e}")
-            print("Falling back to CPU only loading without auto-mapping...")
+            print("Falling back to CPU only loading without auto-mapping (if applicable) and explicitly float32...")
             try:
                 self.model = AutoModelForCausalLM.from_pretrained(
                     llm_model_name,
                     torch_dtype=torch.float32, # Always use float32 for CPU fallback
-                    # REMOVED quantization_config=bnb_config (no 4-bit loading for Colab GPU)
                     device_map="cpu" # Force CPU in fallback
                 )
-                self.device = "cpu"
+                self.device = "cpu" # Confirm device is CPU for fallback
                 print(f"LLM '{llm_model_name}' loaded successfully on CPU as fallback.")
             except Exception as e_cpu:
                 print(f"Failed to load LLM on CPU as well: {e_cpu}")
                 raise RuntimeError(f"Could not load the LLM model {llm_model_name}. "
                                    "Check your internet connection, model name, and system memory/GPU. "
-                                   "Consider a smaller model or more RAM.")
+                                   "Consider a smaller model (e.g., 'TinyLlama/TinyLlama-1.1B-Chat-v1.0') or more RAM if this persists. "
+                                   "If running on a free Colab GPU, ensure the runtime is GPU and sometimes restarting runtime helps.")
 
         # Initialize the RAG system
         self.rag_system = MedicalProductRAG(data_path=data_path)
@@ -83,71 +82,85 @@ class MedicalRecommendationSystem:
         # 2. Prepare context for the LLM
         context_parts = []
         for i, product in enumerate(retrieved_products):
+            # Make context extremely clear and concise for the LLM
             context_parts.append(
-                f"PRODUCT NAME: {product.get('product_name', 'N/A')}\n"
+                f"Product {i+1}:\n"
+                f"NAME: {product.get('product_name', 'N/A')}\n"
                 f"USE CASE: {product.get('use_for', 'N/A')}\n"
-                f"SIDE EFFECTS: {product.get('side_effects', 'No known side effects')}\n"
+                f"SIDE EFFECTS: {product.get('side_effects', 'No known side effects')}"
             )
-        context = "\n---\n".join(context_parts) # Separate products with --- for clarity
+        context = "\n\n".join(context_parts) # Separate products with double newline for clarity
 
 
         # 3. Create the prompt for the LLM
+        # IMPORTANT: Make the prompt even MORE directive and restrictive
+        # Adding roles helps some models understand intent better.
         prompt = (
-            f"You are a helpful AI assistant specialized in recommending over-the-counter medical products. "
-            f"Your task is to provide a concise and direct recommendation. "
-            f"You MUST only use information from the 'Available Products (Context)' section below. "
-            f"Do NOT add any external knowledge, disclaimers, or conversational filler. "
-            f"Just the direct recommendation(s) in a numbered list.\n\n"
-            f"--- Available Products (Context) ---\n"
+            f"You are a highly precise medical AI assistant that strictly follows instructions. "
+            f"Your task is to recommend over-the-counter medical products based ONLY on the 'AVAILABLE PRODUCTS' below. "
+            f"You MUST format your output as a numbered list of recommendations. "
+            f"For each recommended product, state its exact 'NAME', 'USE CASE', and 'SIDE EFFECTS' from the provided context. "
+            f"Do NOT include any other text, disclaimers, conversational filler, or external information. "
+            f"If no product is suitable, state 'No suitable product found.'.\n\n"
+            f"--- AVAILABLE PRODUCTS ---\n"
             f"{context}\n\n"
-            f"--- User Symptoms ---\n"
+            f"--- USER SYMPTOMS ---\n"
             f"Symptoms: '{user_symptoms}'\n\n"
-            f"--- Recommendation ---\n"
-            f"Based on the user's symptoms and the provided product information, recommend the most appropriate "
-            f"over-the-counter medical product(s). For each recommended product, clearly state its name, its primary use case, and its potential side effects."
-            f"Example: 1. Product Name: [Name], Use: [Use Case], Side Effects: [Side Effects]\n"
-            f"Recommendation:"
+            f"--- RECOMMENDATION (Numbered List ONLY) ---\n"
         )
 
         # 4. Generate response using the LLM
         inputs = self.tokenizer(prompt, return_tensors="pt", return_attention_mask=True).to(self.device)
 
+        # Generate output tokens
         output_tokens = self.model.generate(
             **inputs,
-            max_new_tokens=150,     # Drastically reduced to prevent rambling
+            max_new_tokens=150,     # Reduced slightly to try and prevent rambling
             num_beams=1,            # Use greedy search (deterministic)
             do_sample=False,        # Do not sample (deterministic)
-            temperature=0.7,        # Will be ignored, but good practice to keep
-            top_k=50,               # Will be ignored, but good practice to keep
+            temperature=0.0,        # Set temperature to 0.0 for maximum determinism
+            top_k=0,                # Set top_k to 0 (ignored for greedy search but explicit)
+            top_p=1.0,              # Set top_p to 1.0 (ignored for greedy search but explicit)
             no_repeat_ngram_size=2, # Helps avoid repetitive phrases
-            early_stopping=True,    # Will be ignored, but good practice to keep
+            early_stopping=True,    # Stop when EOS token is generated
             pad_token_id=self.tokenizer.pad_token_id,
-            eos_token_id=self.tokenizer.eos_token_id, # Explicitly tell model what end-of-sentence token is
+            eos_token_id=self.tokenizer.eos_token_id,
         )
 
+        # Decode the generated text and extract ONLY the part after the last prompt marker
         generated_text = self.tokenizer.decode(output_tokens[0], skip_special_tokens=True)
-
+        
         # Post-process: Extract only the LLM's recommendation part
-        llm_recommendation = generated_text.strip()
+        # Find the start of the "--- RECOMMENDATION (Numbered List ONLY) ---" section in the *original prompt*,
+        # and extract everything after it from the *generated text*.
+        start_marker_in_prompt = "--- RECOMMENDATION (Numbered List ONLY) ---\n"
+        prompt_length_in_output = generated_text.rfind(start_marker_in_prompt)
         
-        start_marker = "\nRecommendation:"
-        if start_marker in llm_recommendation:
-            llm_recommendation = llm_recommendation.rpartition(start_marker)[2].strip()
-        
-        if "--- Available Products (Context) ---" in llm_recommendation:
-            llm_recommendation = llm_recommendation.split("--- Available Products (Context) ---")[0].strip()
-        if "--- User Symptoms ---" in llm_recommendation:
-            llm_recommendation = llm_recommendation.split("--- User Symptoms ---")[0].strip()
-        if "--- Recommendation ---" in llm_recommendation:
-            llm_recommendation = llm_recommendation.split("--- Recommendation ---")[0].strip()
-        
-        if not llm_recommendation or len(llm_recommendation.split()) < 5: 
-            llm_recommendation = "I'm sorry, I couldn't generate a specific recommendation based on the provided information. Please consult a medical professional if your symptoms persist or worsen."
+        if prompt_length_in_output != -1:
+            llm_recommendation = generated_text[prompt_length_in_output + len(start_marker_in_prompt):].strip()
+        else:
+            # Fallback if marker not found, take everything after the last "---" section.
+            # This is a less reliable fallback for TinyLlama.
+            last_marker_index = generated_text.rfind("---")
+            if last_marker_index != -1:
+                llm_recommendation = generated_text[last_marker_index + 3:].strip()
+            else:
+                llm_recommendation = generated_text.strip() # As a last resort, take all text
+
+        # Final check for emptiness or non-compliance (e.g., if LLM still rambles)
+        if not llm_recommendation or len(llm_recommendation.split()) < 5 or \
+           "Note:" in llm_recommendation or "Please consult" in llm_recommendation or \
+           "I'm sorry" in llm_recommendation:
+            llm_recommendation = "I'm sorry, I couldn't generate a specific recommendation in the requested format based on the provided information. Please consult a medical professional if your symptoms persist or worsen."
+        elif not llm_recommendation.strip().startswith("1.") and not llm_recommendation.strip().startswith("No suitable product found"):
+            # Further refinement to enforce numbered list if not starting with "1."
+            llm_recommendation = "I was unable to format the recommendation as a numbered list. Here's what I found:\n" + llm_recommendation
 
 
         # Calculate a simple confidence score
         confidence_score = 0.0
         if retrieved_products:
+            # The relevance score from RAG is already between 0 and 1
             confidence_score = retrieved_products[0].get('relevance_score', 0.0)
 
         print(f"LLM Recommendation Generated. Confidence: {confidence_score:.2f}")
@@ -161,7 +174,12 @@ class MedicalRecommendationSystem:
 if __name__ == "__main__":
     print("--- Testing MedicalRecommendationSystem ---")
     
-    system = MedicalRecommendationSystem()
+    try:
+        system = MedicalRecommendationSystem(llm_model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0")
+    except RuntimeError as e:
+        print(f"Initialization failed: {e}")
+        print("Exiting test. Please adjust 'llm_model_name' or ensure sufficient resources.")
+        exit()
 
     test_cases = [
         "I have a fever and body pain.",

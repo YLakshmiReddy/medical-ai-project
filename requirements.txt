@@ -3,8 +3,7 @@ sentence-transformers
 faiss-cpu
 fastapi
 uvicorn[standard]
-torch # For Colab, this will correctly pull the GPU version with the right Colab runtime.
+torch # This will install the latest torch. If you want CPU specific, use torch==X.Y.Z+cpu as discussed before.
 accelerate
 pydantic
 numpy
-# REMOVED bitsandbytes as it's not needed for standard GPU usage in Colab
