@@ -93,7 +93,7 @@ class MedicalRecommendationSystem:
                 f"USE CASE: {product.get('use_for', 'N/A')}\n"
                 f"SIDE EFFECTS: {product.get('side_effects', 'No known side effects')}\n"
             )
-        context = "\n---\n".join(context_parts)
+        context = "\n---\n".join(context_parts) # Separate products with --- for clarity
 
 
         # 3. Create the prompt for the LLM

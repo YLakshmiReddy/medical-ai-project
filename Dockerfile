@@ -24,7 +24,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Expose the port that FastAPI will run on
-EXPOSE 10000 # Render default port (COMMENT IS FIXED HERE)
+EXPOSE 10000 
 
 # Command to run the application
 CMD ["bash", "entrypoint.sh"] # Use bash to run the shell script
