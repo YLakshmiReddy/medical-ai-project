@@ -19,7 +19,7 @@ class MedicalRecommendationSystem:
         print(f"Using device: {self.device}")
 
         # Define 4-bit quantization config for memory efficiency
-        # This is for the `load_in_4bit` argument for CPU compatibility
+        # This is for the `load_in_4bit` argument
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,                 # Enable 4-bit loading
             bnb_4bit_quant_type="nf4",         # Use NormalFloat4 quantization
@@ -34,13 +34,12 @@ class MedicalRecommendationSystem:
         
         # Load the LLM model
         try:
-            # First attempt: potentially CUDA, falling back to CPU if needed
             self.model = AutoModelForCausalLM.from_pretrained(
                 llm_model_name,
                 quantization_config=bnb_config, # Apply 4-bit quantization config
                 device_map="auto" # Let accelerate manage device mapping
             )
-            # Ensure model is on the correct device if device_map="auto" lands it elsewhere
+            # If device_map="auto" puts it on meta/cpu and device is CPU, ensure it's on right device.
             if self.device == "cpu" and self.model.device.type != "cpu":
                  self.model.to(self.device)
             print(f"LLM '{llm_model_name}' loaded successfully on {self.device}.")
@@ -48,7 +47,6 @@ class MedicalRecommendationSystem:
             print(f"Error loading LLM '{llm_model_name}' on {self.device}: {e}")
             print("Falling back to CPU only loading with explicit 4-bit config...")
             try:
-                # Second attempt (CPU fallback, forcing 4-bit)
                 self.model = AutoModelForCausalLM.from_pretrained(
                     llm_model_name,
                     quantization_config=bnb_config, # Apply 4-bit config

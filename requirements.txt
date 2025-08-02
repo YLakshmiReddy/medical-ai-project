@@ -3,7 +3,8 @@ sentence-transformers
 faiss-cpu
 fastapi
 uvicorn[standard]
+torch
 accelerate
-bitsandbytes==0.43.1
 pydantic
 numpy
+bitsandbytes==0.43.1 # ADD THIS LINE
