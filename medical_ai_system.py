@@ -1,11 +1,11 @@
 # D:\medical_ai_project\medical_ai_system.py
 
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig # ADD BitsAndBytesConfig
 from rag_system import MedicalProductRAG # Import your RAG system
 import torch
 
 class MedicalRecommendationSystem:
-    def __init__(self, llm_model_name="google/gemma-2b", data_path="medical_products.json"): # CHANGED LLM MODEL NAME
+    def __init__(self, llm_model_name="google/gemma-2b", data_path="medical_products.json"): # CHANGED LLM MODEL NAME to Gemma-2B
         """
         Initializes the medical recommendation system with an LLM and RAG.
         Args:
@@ -18,42 +18,49 @@ class MedicalRecommendationSystem:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"Using device: {self.device}")
 
+        # Define 4-bit quantization config for memory efficiency
+        # This is for the `load_in_4bit` argument for CPU compatibility
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,                 # Enable 4-bit loading
+            bnb_4bit_quant_type="nf4",         # Use NormalFloat4 quantization
+            bnb_4bit_use_double_quant=True,    # Use double quantization
+            bnb_4bit_compute_dtype=torch.float16, # Compute dtype. Even on CPU, this is for bnb internals.
+        )
+
         # Load Tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(llm_model_name)
-        # Ensure pad_token is set for generation. Many models use eos_token as pad_token.
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         
         # Load the LLM model
         try:
-            # Use torch.float16 for GPU to save VRAM. Use float32 for CPU.
-            # device_map="auto" attempts to load model parts across available GPUs or CPU.
-            # REMOVED load_in_8bit=True here as Gemma-2B is smaller
+            # First attempt: potentially CUDA, falling back to CPU if needed
             self.model = AutoModelForCausalLM.from_pretrained(
                 llm_model_name,
-                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                device_map="auto" # This helps with memory management on GPUs
+                quantization_config=bnb_config, # Apply 4-bit quantization config
+                device_map="auto" # Let accelerate manage device mapping
             )
-            # If device_map="auto" fails or if on CPU, ensure model is on the correct device
+            # Ensure model is on the correct device if device_map="auto" lands it elsewhere
             if self.device == "cpu" and self.model.device.type != "cpu":
-                 self.model.to(self.device) # Explicitly move to CPU if it landed elsewhere
+                 self.model.to(self.device)
             print(f"LLM '{llm_model_name}' loaded successfully on {self.device}.")
         except Exception as e:
             print(f"Error loading LLM '{llm_model_name}' on {self.device}: {e}")
-            print("Falling back to CPU only loading without auto-mapping...")
+            print("Falling back to CPU only loading with explicit 4-bit config...")
             try:
-                # REMOVED load_in_8bit=True here (fallback)
+                # Second attempt (CPU fallback, forcing 4-bit)
                 self.model = AutoModelForCausalLM.from_pretrained(
                     llm_model_name,
-                    torch_dtype=torch.float32, # Always use float32 for CPU
-                    device_map="cpu" # Force CPU
+                    quantization_config=bnb_config, # Apply 4-bit config
+                    device_map="cpu" # Force CPU in fallback
                 )
-                self.device = "cpu" # Confirm device is CPU
+                self.device = "cpu"
                 print(f"LLM '{llm_model_name}' loaded successfully on CPU as fallback.")
             except Exception as e_cpu:
                 print(f"Failed to load LLM on CPU as well: {e_cpu}")
                 raise RuntimeError(f"Could not load the LLM model {llm_model_name}. "
-                                   "Check your internet connection, model name, and system memory/GPU.")
+                                   "Check your internet connection, model name, and system memory/GPU. "
+                                   "Consider a smaller model or more RAM.")
 
         # Initialize the RAG system
         self.rag_system = MedicalProductRAG(data_path=data_path)
@@ -135,7 +142,7 @@ class MedicalRecommendationSystem:
         if start_marker in llm_recommendation:
             llm_recommendation = llm_recommendation.rpartition(start_marker)[2].strip()
         
-        # Aggressive cleanup for common Phi-2 repetitions/runaways
+        # Aggressive cleanup for common Phi-2/Gemma repetitions/runaways
         if "--- Available Products (Context) ---" in llm_recommendation:
             llm_recommendation = llm_recommendation.split("--- Available Products (Context) ---")[0].strip()
         if "--- User Symptoms ---" in llm_recommendation:
