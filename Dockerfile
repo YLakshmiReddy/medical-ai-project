@@ -22,4 +22,4 @@ COPY . .
 EXPOSE 8000
 
 # Command to run the application
-CMD ["bash", "entrypoint.sh"] # Use bash to run the shell script
+CMD ["bash", "-c", "uvicorn app:app --host 0.0.0.0 --port 8000 --workers 1"]
