@@ -3,7 +3,6 @@ sentence-transformers
 faiss-cpu
 fastapi
 uvicorn[standard]
-torch # Let pip find a compatible CPU version for Linux
 accelerate
 pydantic
 numpy

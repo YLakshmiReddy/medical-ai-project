@@ -9,7 +9,10 @@ WORKDIR /app
 # Copy the requirements file into the container
 COPY requirements.txt .
 
-# Install any needed packages specified in requirements.txt
+# Install CPU-only PyTorch first
+RUN pip install --no-cache-dir torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
+
+# Install other packages from requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code into the container
