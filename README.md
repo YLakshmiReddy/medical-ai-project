@@ -25,7 +25,7 @@ The primary objective was to build and deploy an AI system capable of:
 
 ### 1. Model Selection
 
-* **Open-Source LLM:** `microsoft/phi-2` was chosen for its balance of performance and relatively compact size for local inference.
+* **Open-Source LLM:** `TinyLLaMA` was chosen for its balance of performance and relatively compact size for local inference.
 * **Frameworks:**
     * `Hugging Face Transformers`: For loading and interacting with the LLM.
     * `Sentence-Transformers`: For generating embeddings (numerical representations) of text data.
@@ -52,7 +52,7 @@ Instead of full LLM fine-tuning, a **Retrieval-Augmented Generation (RAG)** pipe
 * **Retrieval Process:** When a user query (symptoms) is received, the RAG system:
     1.  Converts the query into an embedding.
     2.  Performs a similarity search in the FAISS index to retrieve the top `k` (default 3) most relevant medical products from the `medical_products.json` dataset.
-* **Augmentation & Generation:** The retrieved product information is then dynamically inserted as `context` into a specially crafted prompt for the `Phi-2` LLM. The LLM then generates a natural language recommendation, strictly based on the provided context, ensuring relevance and factual accuracy from the curated dataset.
+* **Augmentation & Generation:** The retrieved product information is then dynamically inserted as `context` into a specially crafted prompt for the `TinyLLaMA` LLM. The LLM then generates a natural language recommendation, strictly based on the provided context, ensuring relevance and factual accuracy from the curated dataset.
 
 ### 4. Inference API
 
@@ -69,11 +69,11 @@ Instead of full LLM fine-tuning, a **Retrieval-Augmented Generation (RAG)** pipe
 ### 5. Deployment
 
 * **Local Deployment:** The solution is designed for local deployment using `uvicorn` to serve the FastAPI application.
-* **Future/Cloud Deployment (Bonus consideration):** The API is built with `FastAPI` and can be easily containerized with Docker for deployment on cloud platforms like GCP, AWS, Render, Railway, HuggingFace Spaces, or Fly.io (backend-only).
+* **Future/Cloud Deployment (Bonus consideration):** The API is built with `FastAPI` and can be easily containerized with Docker for deployment on cloud platforms like Render, Railway, HuggingFace Spaces, (backend-only).
 
 ### 6. Frontend (Optional for Demo)
 
-* **Technology:** Simple HTML, CSS, and JavaScript.
+* **Technology:** Simple HTML, CSS.
 * **Functionality:** A basic web interface (`index.html`) is provided where users can:
     * Input their symptoms into a text area.
     * Receive and display the recommended medicine details and side effects via the `/recommend` API.
@@ -81,11 +81,10 @@ Instead of full LLM fine-tuning, a **Retrieval-Augmented Generation (RAG)** pipe
 ## Deliverables Checklist
 
 * [ ] **Clean and commented codebase:** All project files (`.py`, `.json`, `.html`, `requirements.txt`, `README.md`) organized in a single repository.
-    * **GitHub Link:** [YOUR_GITHUB_REPOSITORY_LINK_HERE]
+    * **GitHub Link:** [https://github.com/YLakshmiReddy/medical-ai-project]
 * [ ] **API for inference:** Implemented with `FastAPI` (`app.py`).
 * [ ] **Model code for fine-tuning or RAG:** Implemented with RAG (`rag_system.py`, `medical_ai_system.py`).
 * [ ] **Deployment link or Docker instructions:** Provided for local setup.
-    * (Optional: Add notes on cloud deployment if you attempt it.)
 * [ ] **Sample Q&A test cases:** Provided within `medical_ai_system.py`'s `if __name__ == "__main__":` block.
 * [ ] **ReadMe:** This document.
 
@@ -93,7 +92,7 @@ Instead of full LLM fine-tuning, a **Retrieval-Augmented Generation (RAG)** pipe
 
 ### Prerequisites
 
-* Python 3.8+ installed.
+* Python 3.13+ installed.
 * (Optional but recommended for Windows): Enable [Developer Mode](https://docs.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development) for optimal Hugging Face caching performance (resolves symlink warnings).
 
 ### Setup Instructions
@@ -112,7 +111,7 @@ Instead of full LLM fine-tuning, a **Retrieval-Augmented Generation (RAG)** pipe
     ```bash
     pip install -r requirements.txt
     ```
-    * **Note:** The first time `medical_ai_system.py` or `app.py` runs, the `microsoft/phi-2` LLM (approx. 7GB) will be downloaded. This requires an internet connection and will take significant time.
+    * **Note:** The first time `medical_ai_system.py` or `app.py` runs, the `TinyLLaMA` LLM (approx. 6.5GB) will be downloaded. This requires an internet connection and will take significant time.
 
 ### Running the System
 
@@ -151,14 +150,13 @@ You can test the system with these example symptoms:
 * **LLM Fine-tuning:** For more domain-specific and accurate responses, fine-tuning a smaller LLM (e.g., Llama 3 8B, Mistral 7B) on a carefully curated Q&A dataset would significantly improve quality. This would require more computational resources (e.g., a GPU with 16GB+ VRAM or cloud services).
 * **Robust Confidence Scoring:** Develop a more sophisticated method for calculating confidence scores, potentially incorporating LLM's internal probabilities or RAG re-ranking techniques.
 * **Error Handling and Edge Cases:** Enhance error handling for unusual user inputs, ambiguous symptoms, or cases where no relevant products are found.
-* **User Interface (UI) / User Experience (UX) Improvement:** Develop a more interactive and visually appealing frontend using frameworks like React, Next.js, or Vue.js.
 * **Dockerization:** Containerize the FastAPI application using Docker for easier and more consistent deployment across different environments.
-* **Cloud Deployment:** Deploy the Dockerized application to cloud platforms (e.g., AWS EC2/ECS, Google Cloud Run/App Engine, Render, Railway, HuggingFace Spaces) for accessibility and scalability.
+* **Cloud Deployment:** Deploy the Dockerized application to cloud platforms (e.g., Render, Railway, HuggingFace Spaces) for accessibility and scalability.
 * **Re-ranking in RAG:** Implement a re-ranking step in the RAG pipeline using a cross-encoder model to further improve the relevance of retrieved documents before passing them to the LLM.
 
 ## Acknowledgements
 
-* Hugging Face `transformers` library and the `microsoft/phi-2` model.
+* Hugging Face `transformers` library and the `TinyLLaMA` model.
 * `sentence-transformers` library and `all-MiniLM-L6-v2` model.
 * `FAISS` for efficient similarity search.
 * `FastAPI` and `Uvicorn` for API development.
